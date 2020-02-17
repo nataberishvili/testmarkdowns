@@ -1,0 +1,93 @@
+---
+
+---
+
+
+## Medicare - Exploratory Data Analysis
+
+The data is obtained from the Centers of Medicare and Medicaid Services https://www.cms.gov/Research-Statistics-Data-and-Systems/Statistics-Trends-and-Reports/Medicare-Provider-Charge-Data/Inpatient to add the time component to the analysis I combined 3 datasets from 2015, 2016, and 2017 years. Some of the questions I want to answer:
+.Which Diagnostic Related Groups cost Medicare the most?
+.What are the most commong hospital discharges? 
+.What is the trend in last 3 years?
+.Which States and Hospitals charge the most? etc.
+
+Some of the variables:
+.DRG Definition - Medicare Severity Diagnosis Related Group
+.Total Discharges - The total discharges indicate the number of beneficiaries who were released from the inpatient hospital after receiving care.
+.Average Covered Charges - refers to what the provider bills to Medicare
+.Average Total Payments - refers to what Medicare actually pays to the provider as well as co-payment and deductible amounts that the beneficiary is responsible for and payments by third parties for coordination of benefits
+.Average Medicare Payments
+
+
+```{r eval=FALSE}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(zipcode)
+data(zipcode)
+library(VIM)
+library(lubridate)
+```
+
+```{r nata}
+
+
+data1 <- read.csv("2015.csv", stringsAsFactors = FALSE, dec=",")
+data2 <- read.csv("2016.csv", stringsAsFactors = FALSE, dec=",")
+data3 <- read.csv("2017.csv", stringsAsFactors = FALSE, dec=",")
+
+head(data2); # head(data3);  glimpse(data2)
+
+data1$Year <- 2015
+data2$Year <- 2016
+data3$Year <- 2017
+```
+I will combine those datasets with rbind. rbind combines datasets by rows. (In order to combine the datasets, the number and the names of the columns must be the same in the datasets)
+
+
+```{r santa}
+payment <- rbind(data1, data2, data3)
+dim(payment)
+```
+
+Covered charges, medicare payments and total payments contain both $ dollar signs and commas, in order to do data manipulation/aggregation I will convert those variables into numeric values and remove dollar signs and commas.
+
+```{r sa}
+payment <- rbind(data1, data2, data3)
+dim(payment)
+```
+
+```{r kaka }
+payment$Average.Covered.Charges <- as.numeric(gsub("[\\$,]","", payment$Average.Covered.Charges))
+payment$Average.Medicare.Payments <- as.numeric(gsub("[\\$,]","", payment$Average.Medicare.Payments))
+payment$Average.Total.Payments <- as.numeric(gsub("[\\$,]","", payment$Average.Total.Payments))
+
+sum(is.na(payment))
+```
+
+```{sato }
+df_top17 <- payment %>% filter(Year == 2017) %>% mutate(total_c = Average.Covered.Charges*Total.Discharges,
+                        total_p = Average.Medicare.Payments*Total.Discharges) %>% 
+  group_by(Provider.State) %>%
+  summarise(total_charges=sum(total_c), total_paid = sum(total_p),
+            ratio_paid_charged = sum(total_p)/sum(total_c)) 
+df_top17 <- df_top17 %>% top_n(15, wt = total_charges) %>%  mutate(country_medicare_charges = sum(df_top17$total_charges), charges_proportion = total_charges/country_medicare_charges) %>%
+  arrange(desc(total_charges))
+knitr::kable(df_top17)
+```
+
+plot
+```{deda }
+marina <- ggplot(df_top17, 
+       aes(x = reorder(Provider.State, charges_proportion), y = charges_proportion)) + 
+  geom_bar(stat="identity", position="identity", fill=ifelse(df_top17$Provider.State == "NY", "#1380A1", "#dddddd")) +
+  geom_hline(yintercept = 0, size = 1, colour="#333333") +
+  theme_bw() +
+  coord_flip() +
+  labs(title="Medicare total charges",
+       subtitle = "Highest total charges by State, 2017") +
+  theme(panel.grid.major.x = element_line(color="#cbcbcb"), 
+        panel.grid.major.y=element_blank())
+marina
+```
+
